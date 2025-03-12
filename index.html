@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>动量守恒定律演示</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    .scenario { margin-bottom: 40px; }
+    .anim-area {
+      position: relative;
+      width: 90%;
+      max-width: 600px;
+      height: 200px;
+      border: 1px solid #aaa;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    .ball {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    /* 场景一：弹性碰撞 两小球（红、蓝） */
+    #elasticAnim .ball:nth-child(1) { background-color: #e74c3c; /* 红色 */ }
+    #elasticAnim .ball:nth-child(2) { background-color: #3498db; /* 蓝色 */ }
+    /* 场景二：非弹性碰撞 两小球（绿、橙） */
+    #inelasticAnim .ball:nth-child(1) { background-color: #2ecc71; /* 绿色 */ }
+    #inelasticAnim .ball:nth-child(2) { background-color: #e67e22; /* 橙色 */ }
+    /* 场景三：反冲运动 大小球（灰：重物，黄：轻物） */
+    #recoilAnim .ball:nth-child(1) {
+      background-color: #7f8c8d; /* 灰色重球 */
+      width: 40px;
+      height: 40px;
+    }
+    #recoilAnim .ball:nth-child(2) { background-color: #f1c40f; /* 黄色轻球 */ }
+    /* 场景四：多体碰撞 多小球（红、蓝、绿、紫） */
+    #multiAnim .ball:nth-child(1) { background-color: #e74c3c; /* 红 */ }
+    #multiAnim .ball:nth-child(2) { background-color: #3498db; /* 蓝 */ }
+    #multiAnim .ball:nth-child(3) { background-color: #2ecc71; /* 绿 */ }
+    #multiAnim .ball:nth-child(4) { background-color: #9b59b6; /* 紫 */ }
+    /* 按钮样式（可根据需要调整） */
+    .scenario button {
+      padding: 5px 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h1>动量守恒定律演示</h1>
+  
+  <div class="scenario">
+    <h2>弹性碰撞</h2>
+    <p>在弹性碰撞中，总动量和总动能保持守恒。下方演示了两个小球的碰撞，碰撞前后动量和能量均未损失。</p>
+    <div class="anim-area" id="elasticAnim">
+      <div class="ball" id="elasticBall1"></div>
+      <div class="ball" id="elasticBall2"></div>
+    </div>
+    <button id="elasticBtn">开始</button>
+  </div>
+  
+  <div class="scenario">
+    <h2>非弹性碰撞</h2>
+    <p>在完全非弹性碰撞中，两物体碰撞后会粘在一起。碰撞过程中总动量守恒，但部分机械能转化为了内能（例如形变、热能等），动能不再守恒。</p>
+    <div class="anim-area" id="inelasticAnim">
+      <div class="ball" id="inelasticBall1"></div>
+      <div class="ball" id="inelasticBall2"></div>
+    </div>
+    <button id="inelasticBtn">开始</button>
+  </div>
+  
+  <div class="scenario">
+    <h2>反冲运动</h2>
+    <p>反冲运动展示了系统内部作用力导致物体分离的情况，例如枪的后坐力或火箭推进。在系统不受外力时，总动量依然守恒。</p>
+    <div class="anim-area" id="recoilAnim">
+      <div class="ball" id="recoilBallHeavy"></div>
+      <div class="ball" id="recoilBallLight"></div>
+    </div>
+    <button id="recoilBtn">开始</button>
+  </div>
+  
+  <div class="scenario">
+    <h2>多体碰撞</h2>
+    <p>该演示展示多个物体连续碰撞时动量的传递过程。一个物体碰撞后将动量传给下一个物体，体现动量在多体系统中的传递（类似牛顿摆的效果）。</p>
+    <div class="anim-area" id="multiAnim">
+      <div class="ball"></div>
+      <div class="ball"></div>
+      <div class="ball"></div>
+      <div class="ball"></div>
+    </div>
+    <button id="multiBtn">开始</button>
+  </div>
+  
+  <script>
+    // 通用弹性碰撞计算函数（1维，两物体）
+    function elasticCollision(m1, v1, m2, v2) {
+      // 返回碰撞后的两个速度值 [v1', v2']
+      return [
+        ((m1 - m2) / (m1 + m2)) * v1 + (2 * m2 / (m1 + m2)) * v2,
+        (2 * m1 / (m1 + m2)) * v1 + ((m2 - m1) / (m1 + m2)) * v2
+      ];
+    }
+    
+    // 场景1：弹性碰撞
+    const eBall1 = document.getElementById('elasticBall1');
+    const eBall2 = document.getElementById('elasticBall2');
+    const elasticContainer = document.getElementById('elasticAnim');
+    let ePlaying = false;
+    let eAnimationId;
+    let eTime = 0;
+    const eDuration = 3.0; // 演示总时长（秒）
+    // 物体属性
+    let eMass1 = 1, eMass2 = 1;
+    let eRadius1 = 15, eRadius2 = 15;
+    let ePos1, ePos2;
+    let eVel1, eVel2;
+    
+    function resetElastic() {
+      const width = elasticContainer.offsetWidth;
+      eTime = 0;
+      // 初始位置（中心点坐标）
+      ePos1 = width * 0.2;
+      ePos2 = width * 0.8;
+      // 初始速度：球1向右运动，球2静止
+      eVel1 = 150; // 像素/秒
+      eVel2 = 0;
+      // 设置初始位置
+      eBall1.style.left = (ePos1 - eRadius1) + 'px';
+      eBall2.style.left = (ePos2 - eRadius2) + 'px';
+    }
+    
+    function stepElastic(timestamp) {
+      if (!stepElastic.lastTime) stepElastic.lastTime = timestamp;
+      const dt = (timestamp - stepElastic.lastTime) / 1000; // 时间增量（秒）
+      stepElastic.lastTime = timestamp;
+      eTime += dt;
+      // 更新位置
+      ePos1 += eVel1 * dt;
+      ePos2 += eVel2 * dt;
+      // 碰撞检测
+      if (!stepElastic.collided) {
+        if (ePos2 - ePos1 <= eRadius1 + eRadius2) {
+          // 发生碰撞
+          stepElastic.collided = true;
+          // 调整位置至接触点，避免重叠
+          const overlap = eRadius1 + eRadius2 - (ePos2 - ePos1);
+          if (overlap > 0) {
+            ePos1 -= overlap/2;
+            ePos2 += overlap/2;
+          }
+          // 计算碰撞后的速度（弹性碰撞公式）
+          const newV = elasticCollision(eMass1, eVel1, eMass2, eVel2);
+          eVel1 = newV[0];
+          eVel2 = newV[1];
+        }
+      }
+      // 更新DOM元素位置
+      eBall1.style.left = (ePos1 - eRadius1) + 'px';
+      eBall2.style.left = (ePos2 - eRadius2) + 'px';
+      // 判断演示结束
+      if (eTime >= eDuration) {
+        pauseElastic();
+        // 重置记录，为下一次播放做准备
+        stepElastic.lastTime = null;
+        stepElastic.collided = false;
+        elasticBtn.textContent = '重播';
+        return;
+      }
+      // 请求下一帧
+      if (ePlaying) {
+        eAnimationId = requestAnimationFrame(stepElastic);
+      }
+    }
+    
+    function playElastic() {
+      ePlaying = true;
+      stepElastic.lastTime = null;
+      stepElastic.collided = false;
+      eAnimationId = requestAnimationFrame(stepElastic);
+    }
+    function pauseElastic() {
+      ePlaying = false;
+      cancelAnimationFrame(eAnimationId);
+    }
+    function toggleElastic() {
+      if (!ePlaying) {
+        // 如果已结束或从未开始，则重置
+        if (eTime >= eDuration || eTime === 0) {
+          resetElastic();
+        }
+        playElastic();
+        elasticBtn.textContent = '暂停';
+      } else {
+        pauseElastic();
+        elasticBtn.textContent = '继续';
+      }
+    }
+    
+    // 场景2：非弹性碰撞
+    const inBall1 = document.getElementById('inelasticBall1');
+    const inBall2 = document.getElementById('inelasticBall2');
+    const inelasticContainer = document.getElementById('inelasticAnim');
+    let inPlaying = false;
+    let inAnimationId;
+    let inTime = 0;
+    const inDuration = 3.0;
+    let inMass1 = 1, inMass2 = 1;
+    let inRadius1 = 15, inRadius2 = 15;
+    let inPos1, inPos2;
+    let inVel1, inVel2;
+    let inStuck = false;
+    
+    function resetInelastic() {
+      const width = inelasticContainer.offsetWidth;
+      inTime = 0;
+      inStuck = false;
+      // 初始位置
+      inPos1 = width * 0.2;
+      inPos2 = width * 0.8;
+      // 初始速度：球1向右，球2静止
+      inVel1 = 150;
+      inVel2 = 0;
+      // 设置初始位置
+      inBall1.style.left = (inPos1 - inRadius1) + 'px';
+      inBall2.style.left = (inPos2 - inRadius2) + 'px';
+    }
+    
+    function stepInelastic(timestamp) {
+      if (!stepInelastic.lastTime) stepInelastic.lastTime = timestamp;
+      const dt = (timestamp - stepInelastic.lastTime) / 1000;
+      stepInelastic.lastTime = timestamp;
+      inTime += dt;
+      // 更新位置
+      inPos1 += inVel1 * dt;
+      inPos2 += inVel2 * dt;
+      if (!inStuck) {
+        if (inPos2 - inPos1 <= inRadius1 + inRadius2) {
+          // 碰撞发生，黏在一起
+          inStuck = true;
+          // 调整位置避免重叠
+          const overlap = inRadius1 + inRadius2 - (inPos2 - inPos1);
+          if (overlap > 0) {
+            inPos1 -= overlap/2;
+            inPos2 += overlap/2;
+          }
+          // 计算合并后的共同速度（动量守恒）
+          const combinedV = (inMass1 * inVel1 + inMass2 * inVel2) / (inMass1 + inMass2);
+          inVel1 = combinedV;
+          inVel2 = combinedV;
+        }
+      }
+      // 如果已经粘在一起，保持两球相对距离恒定
+      if (inStuck) {
+        const desiredDist = inRadius1 + inRadius2;
+        const actualDist = inPos2 - inPos1;
+        if (Math.abs(actualDist - desiredDist) > 1e-6) {
+          const adjust = (desiredDist - actualDist) / 2;
+          inPos1 -= adjust;
+          inPos2 += adjust;
+        }
+      }
+      // 更新DOM位置
+      inBall1.style.left = (inPos1 - inRadius1) + 'px';
+      inBall2.style.left = (inPos2 - inRadius2) + 'px';
+      if (inTime >= inDuration) {
+        pauseInelastic();
+        stepInelastic.lastTime = null;
+        inelasticBtn.textContent = '重播';
+        return;
+      }
+      if (inPlaying) {
+        inAnimationId = requestAnimationFrame(stepInelastic);
+      }
+    }
+    
+    function playInelastic() {
+      inPlaying = true;
+      stepInelastic.lastTime = null;
+      inAnimationId = requestAnimationFrame(stepInelastic);
+    }
+    function pauseInelastic() {
+      inPlaying = false;
+      cancelAnimationFrame(inAnimationId);
+    }
+    function toggleInelastic() {
+      if (!inPlaying) {
+        if (inTime >= inDuration || inTime === 0) {
+          resetInelastic();
+        }
+        playInelastic();
+        inelasticBtn.textContent = '暂停';
+      } else {
+        pauseInelastic();
+        inelasticBtn.textContent = '继续';
+      }
+    }
+    
+    // 场景3：反冲运动
+    const rBallHeavy = document.getElementById('recoilBallHeavy');
+    const rBallLight = document.getElementById('recoilBallLight');
+    const recoilContainer = document.getElementById('recoilAnim');
+    let rPlaying = false;
+    let rAnimationId;
+    let rTime = 0;
+    const rDuration = 3.0;
+    // 定义质量（heavy为轻的3倍）
+    let rMassHeavy = 3, rMassLight = 1;
+    // 半径：重物40px，轻物30px
+    let rRadiusHeavy = 20, rRadiusLight = 15;
+    let rPosHeavy, rPosLight;
+    let rVelHeavy, rVelLight;
+    
+    function resetRecoil() {
+      const width = recoilContainer.offsetWidth;
+      rTime = 0;
+      // 初始位置：两个物体在容器中央接触
+      const center = width / 2;
+      rPosHeavy = center - rRadiusHeavy;
+      rPosLight = center + rRadiusLight;
+      // 初始速度：给予等量反方向的动量（重物速率低，轻物速率高）
+      rVelLight = 200; // 轻物向右
+      rVelHeavy = - (rMassLight * rVelLight) / rMassHeavy; // 重物向左
+      // 设置初始DOM位置
+      rBallHeavy.style.left = (rPosHeavy - rRadiusHeavy) + 'px';
+      rBallLight.style.left = (rPosLight - rRadiusLight) + 'px';
+    }
+    
+    function stepRecoil(timestamp) {
+      if (!stepRecoil.lastTime) stepRecoil.lastTime = timestamp;
+      const dt = (timestamp - stepRecoil.lastTime) / 1000;
+      stepRecoil.lastTime = timestamp;
+      rTime += dt;
+      // 更新位置
+      rPosHeavy += rVelHeavy * dt;
+      rPosLight += rVelLight * dt;
+      // 更新DOM
+      rBallHeavy.style.left = (rPosHeavy - rRadiusHeavy) + 'px';
+      rBallLight.style.left = (rPosLight - rRadiusLight) + 'px';
+      if (rTime >= rDuration) {
+        pauseRecoil();
+        stepRecoil.lastTime = null;
+        recoilBtn.textContent = '重播';
+        return;
+      }
+      if (rPlaying) {
+        rAnimationId = requestAnimationFrame(stepRecoil);
+      }
+    }
+    function playRecoil() {
+      rPlaying = true;
+      stepRecoil.lastTime = null;
+      rAnimationId = requestAnimationFrame(stepRecoil);
+    }
+    function pauseRecoil() {
+      rPlaying = false;
+      cancelAnimationFrame(rAnimationId);
+    }
+    function toggleRecoil() {
+      if (!rPlaying) {
+        if (rTime >= rDuration || rTime === 0) {
+          resetRecoil();
+        }
+        playRecoil();
+        recoilBtn.textContent = '暂停';
+      } else {
+        pauseRecoil();
+        recoilBtn.textContent = '继续';
+      }
+    }
+    
+    // 场景4：多体碰撞
+    const multiContainer = document.getElementById('multiAnim');
+    const mBalls = multiContainer.getElementsByClassName('ball');
+    const multiBtn = document.getElementById('multiBtn');
+    let mPlaying = false;
+    let mAnimationId;
+    let mTime = 0;
+    const mDuration = 5.0;
+    // 假设4个小球质量相等
+    const mMass = [1,1,1,1];
+    const mRadius = [15,15,15,15];
+    let mPos = [0,0,0,0];
+    let mVel = [0,0,0,0];
+    
+    function resetMulti() {
+      const width = multiContainer.offsetWidth;
+      mTime = 0;
+      // 初始位置：在容器内一段范围均匀分布4个球
+      const leftMargin = 0.1 * width;
+      const rightMost = 0.9 * width;
+      const interval = (rightMost - leftMargin) / (mBalls.length - 1);
+      for (let i = 0; i < mBalls.length; i++) {
+        mPos[i] = leftMargin + interval * i;
+        mBalls[i].style.left = (mPos[i] - mRadius[i]) + 'px';
+      }
+      // 初始速度：第一个球向右，其余静止
+      mVel[0] = 150;
+      for (let j = 1; j < mBalls.length; j++) {
+        mVel[j] = 0;
+      }
+    }
+    
+    function stepMulti(timestamp) {
+      if (!stepMulti.lastTime) stepMulti.lastTime = timestamp;
+      const dt = (timestamp - stepMulti.lastTime) / 1000;
+      stepMulti.lastTime = timestamp;
+      mTime += dt;
+      // 更新所有球的位置
+      for (let i = 0; i < mBalls.length; i++) {
+        mPos[i] += mVel[i] * dt;
+      }
+      // 检查相邻两球碰撞
+      for (let i = 0; i < mBalls.length - 1; i++) {
+        if (mPos[i+1] - mPos[i] <= mRadius[i] + mRadius[i+1]) {
+          // 发生碰撞
+          const overlap = mRadius[i] + mRadius[i+1] - (mPos[i+1] - mPos[i]);
+          if (overlap > 0) {
+            mPos[i] -= overlap/2;
+            mPos[i+1] += overlap/2;
+          }
+          // 计算碰撞后速度
+          const newVs = elasticCollision(mMass[i], mVel[i], mMass[i+1], mVel[i+1]);
+          mVel[i] = newVs[0];
+          mVel[i+1] = newVs[1];
+        }
+      }
+      // 更新DOM位置
+      for (let i = 0; i < mBalls.length; i++) {
+        mBalls[i].style.left = (mPos[i] - mRadius[i]) + 'px';
+      }
+      if (mTime >= mDuration) {
+        pauseMulti();
+        stepMulti.lastTime = null;
+        multiBtn.textContent = '重播';
+        return;
+      }
+      if (mPlaying) {
+        mAnimationId = requestAnimationFrame(stepMulti);
+      }
+    }
+    function playMulti() {
+      mPlaying = true;
+      stepMulti.lastTime = null;
+      mAnimationId = requestAnimationFrame(stepMulti);
+    }
+    function pauseMulti() {
+      mPlaying = false;
+      cancelAnimationFrame(mAnimationId);
+    }
+    function toggleMulti() {
+      if (!mPlaying) {
+        if (mTime >= mDuration || mTime === 0) {
+          resetMulti();
+        }
+        playMulti();
+        multiBtn.textContent = '暂停';
+      } else {
+        pauseMulti();
+        multiBtn.textContent = '继续';
+      }
+    }
+    
+    // 绑定按钮事件
+    const elasticBtn = document.getElementById('elasticBtn');
+    const inelasticBtn = document.getElementById('inelasticBtn');
+    const recoilBtn = document.getElementById('recoilBtn');
+    // multiBtn 已在上方获取
+    elasticBtn.addEventListener('click', toggleElastic);
+    inelasticBtn.addEventListener('click', toggleInelastic);
+    recoilBtn.addEventListener('click', toggleRecoil);
+    multiBtn.addEventListener('click', toggleMulti);
+    
+    // 页面加载时重置各场景至初始状态
+    resetElastic();
+    resetInelastic();
+    resetRecoil();
+    resetMulti();
+  </script>
+</body>
+</html>
